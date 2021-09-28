@@ -16,7 +16,7 @@ Replace `MY_EMAIL` and `MY_PASSWORD` with your Frndly TV login details
 
 You can retrieve the playlist URL via the status page.
 
-    http://127.0.0.1:8182
+    http://127.0.0.1:8183
 
 ## Add Source to Channels
 
