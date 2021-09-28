@@ -10,7 +10,7 @@ This simple Docker image will generate an M3U playlist optimized for use in [Cha
 
 Running the container is easy. Fire up the container as usual. You can set which port it runs on.
 
-    docker run -d --restart unless-stopped --name frndlytv-for-channels -p 8183:80 --env USERNAME=MY_EMAIL --env PASSWORD=MY_PASSWORD matthuisman/frndlytv-for-channels
+    docker run -d --restart unless-stopped --name frndlytv-for-channels -p 8183:80 --env "USERNAME=MY_EMAIL" --env "PASSWORD=MY_PASSWORD" matthuisman/frndlytv-for-channels
 
 Replace `MY_EMAIL` and `MY_PASSWORD` with your Frndly TV login details
 
@@ -24,6 +24,9 @@ Once you have your the container running, you can use it with [custom channels](
 
 Add a new source in Channels DVR Server and choose `M3U Playlist`.  
 Fill out the form using your new playlist URL from above.
+
+Leave the EPG field blank.  
+The playlist uses Gracenote IDs which will make [Channels](https://getchannels.com) automatically fetch the EPG.
 
 ## License
 
