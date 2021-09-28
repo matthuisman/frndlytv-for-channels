@@ -10,9 +10,9 @@ This simple Docker image will generate an M3U playlist and EPG optimized for use
 
 Running the container is easy. Fire up the container as usual. You can set which port it runs on.
 
-    docker run -d --restart unless-stopped --name frndlytv-for-channels -p 8183:80 --env USERNAME=`email` --env PASSWORD=`password` matthuisman/frndlytv-for-channels
+    docker run -d --restart unless-stopped --name frndlytv-for-channels -p 8183:80 --env USERNAME=MY_EMAIL --env PASSWORD=MY_PASSWORD matthuisman/frndlytv-for-channels
 
-Replace `email` and `password` with your Frndly TV login details
+Replace `MY_EMAIL` and `MY_PASSWORD` with your Frndly TV login details
 
 You can retrieve the playlist and EPG URLS via the status page.
 
