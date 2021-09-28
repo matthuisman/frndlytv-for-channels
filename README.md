@@ -14,8 +14,9 @@ Running the container is easy. Fire up the container as usual. You can set which
 
 Replace `MY_EMAIL` and `MY_PASSWORD` with your Frndly TV login details
 
-By default, the image will use your IP location to fetch streams for your location,
-If you want streams for a different location or your location is not supported, simply pass an `IP` environemnt variable to the container with the IP address you want to use.  
+By default, the image will use your IP location to fetch streams for your location.  
+If you want streams for a different location or your location is not supported,  
+simply pass an `IP` environemnt variable to the container with the IP address you want to use.  
 
     docker run -d --restart unless-stopped --name frndlytv-for-channels -p 8183:80 --env "USERNAME=MY_EMAIL" --env "PASSWORD=MY_PASSWORD" --env "IP=72.229.28.185" matthuisman/frndlytv-for-channels
 
