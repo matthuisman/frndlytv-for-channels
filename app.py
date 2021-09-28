@@ -8,6 +8,7 @@ import requests
 PORT = 80
 USERNAME = os.getenv('USERNAME', '').strip()
 PASSWORD = os.getenv('PASSWORD', '').strip()
+IP_ADDR = os.getenv('IP', '').strip()
 
 LOGO_SIZE = 110
 PLAYLIST_URL = 'playlist.m3u'
@@ -18,8 +19,10 @@ HEADERS = {
     'user-agent': 'okhttp/3.12.5',
     'box-id': 'SHIELD30X8X4X0',
     'tenant-code': 'frndlytv',
-    'x-forwarded-for': '72.229.28.185',
 }
+
+if IP_ADDR:
+    HEADERS['x-forwarded-for'] = IP_ADDR
 
 LIVE_MAP = {
     10: [58812, 'the_weather_channel'],
