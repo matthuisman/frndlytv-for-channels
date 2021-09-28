@@ -18,6 +18,7 @@ HEADERS = {
     'user-agent': 'okhttp/3.12.5',
     'box-id': 'SHIELD30X8X4X0',
     'tenant-code': 'frndlytv',
+    'x-forwarded-for': '72.229.28.185',
 }
 
 LIVE_MAP = {
