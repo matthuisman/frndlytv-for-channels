@@ -10,7 +10,7 @@ This simple Docker image will generate an M3U playlist optimized for use in [Cha
 
 Running the container is easy. Fire up the container as usual. You can set which port it runs on.
 
-    docker run -d --restart unless-stopped --name frndlytv-for-channels -p 8183:80 --env "USERNAME=MY_EMAIL" --env "PASSWORD=MY_PASSWORD" matthuisman/frndlytv-for-channels
+    docker run -d --restart unless-stopped --env "USERNAME=MY_EMAIL" --env "PASSWORD=MY_PASSWORD" --name frndlytv-for-channels -p 8183:80 matthuisman/frndlytv-for-channels
 
 Replace `MY_EMAIL` and `MY_PASSWORD` with your Frndly TV login details
 
@@ -18,7 +18,7 @@ By default, the image will use your IP location to fetch streams for your locati
 If you want streams for a different location or your location is not supported,  
 simply pass an `IP` environemnt variable to the container with the IP address you want to use.  
 
-    docker run -d --restart unless-stopped --name frndlytv-for-channels -p 8183:80 --env "USERNAME=MY_EMAIL" --env "PASSWORD=MY_PASSWORD" --env "IP=72.229.28.185" matthuisman/frndlytv-for-channels
+    docker run -d --restart unless-stopped --env "IP=72.229.28.185" --env "USERNAME=MY_EMAIL" --env "PASSWORD=MY_PASSWORD" --name frndlytv-for-channels -p 8183:80 matthuisman/frndlytv-for-channels
 
 The above using `72.229.28.185` will get streams for Manhattan, New York.
 
