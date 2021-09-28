@@ -113,17 +113,18 @@ class Handler(BaseHTTPRequestHandler):
 
         self.wfile.write(b'#EXTM3U\n')
         for row in rows:
-            if row['target']['pageAttributes']['isLive'] != 'true':
-                continue
-            
             id = row['id']
-            gracenote_id = 'tvc-guide-stationid="{}"'.format(LIVE_MAP[id][0]) if id in LIVE_MAP else ''
+            if id not in LIVE_MAP:
+                continue
+
+            name = row['display']['title']
+            gracenote_id = LIVE_MAP[id][0]
+            genre = row['target']['pageAttributes']['RokuGenreCode']
+            url = f'http://{host}/{PLAY_URL}/{id}'
             bucket, path = row['display']['imageUrl'].split(',')
             logo = f'https://d229kpbsb5jevy.cloudfront.net/frndlytv/{LOGO_SIZE}/{LOGO_SIZE}/content/{bucket}/logos/{path}'
-            genre = row['target']['pageAttributes']['RokuGenreCode']
-            name = row['display']['title']
-            url = f'http://{host}/{PLAY_URL}/{id}'
-            self.wfile.write(f'#EXTINF:-1 {gracenote_id} tvg-logo="{logo}" group-title="{genre}",{name}\n{url}\n'.encode('utf8'))
+
+            self.wfile.write(f'#EXTINF:-1 channel-id="frndly-{id}" tvg-logo="{logo}" group-title="{genre}" tvc-guide-stationid="{gracenote_id}",{name}\n{url}\n'.encode('utf8'))
 
     def _status(self):
         self.send_response(200)
