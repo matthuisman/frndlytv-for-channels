@@ -48,6 +48,14 @@ LIVE_MAP = {
 }
 
 def login():
+    if 'session-id' in HEADERS:
+        data = requests.get('https://frndlytv-api.revlet.net/service/api/auth/user/info', headers=HEADERS).json()
+        if data['status']:
+            print('re-logged in')
+            return True
+
+    print("logging in....")
+
     params = {
         'box_id': HEADERS['box-id'],
         'device_id': 43,
@@ -59,7 +67,7 @@ def login():
     }
 
     HEADERS['session-id'] = requests.get('https://frndlytv-api.revlet.net/service/api/v1/get/token', params=params, headers=HEADERS).json()['response']['sessionId']
-    print(HEADERS['session-id'])
+    print('session id: {}'.format(HEADERS['session-id']))
 
     payload = {
         "login_key": PASSWORD,
@@ -72,9 +80,11 @@ def login():
 
     data = requests.post('https://frndlytv-api.revlet.net/service/api/auth/signin', json=payload, headers=HEADERS).json()
     if not data['status']:
-        print(data['error']['message'])
+        print('Failed to login: {}'.format(data['error']['message']))
+        return False
     else:
         print("logged in!")
+        return True
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -92,7 +102,18 @@ class Handler(BaseHTTPRequestHandler):
 
         routes[func]()
 
-    def _play(self):
+    def _request(self, url, login_on_failure=True):
+        data = requests.get(url, headers=HEADERS).json()
+
+        if 'response' not in data:
+            if login_on_failure and login():
+                return self._request(url, login_on_failure=False)
+
+            raise Exception('Failed to get response from url: {}'.format(url))
+
+        return data['response']
+
+    def _play(self, login_on_failure=True):
         id = int(self.path.split('/')[-1])
         if id not in LIVE_MAP:
             print("Could not find that channel")
@@ -101,16 +122,21 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         slug = LIVE_MAP[id][1]
-        data = requests.get(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream?path=channel%2Flive%2F{slug}&code=channel%2Flive%2F{slug}&include_ads=false&is_casted=true', headers=HEADERS).json()
+        data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream?path=channel%2Flive%2F{slug}&code=channel%2Flive%2F{slug}&include_ads=false&is_casted=true')
+
+        try:
+            requests.post('https://frndlytv-api.revlet.net/service/api/v1/stream/session/end', data={'poll_key': data['sessionInfo']['streamPollKey']}, headers=HEADERS)
+        except Exception as e:
+            print('failed to send end stream')
 
         self.send_response(302)
-        self.send_header('location', data['response']['streams'][0]['url'])
+        self.send_header('location', data['streams'][0]['url'])
         self.end_headers()
     
     def _playlist(self):
-        host = self.headers.get('Host')
-        rows = requests.get('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0', headers=HEADERS).json()['response']['data']
+        rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']
 
+        host = self.headers.get('Host')
         self.send_response(200)
         self.end_headers()
 
