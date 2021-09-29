@@ -67,7 +67,6 @@ def login():
     }
 
     HEADERS['session-id'] = requests.get('https://frndlytv-api.revlet.net/service/api/v1/get/token', params=params, headers=HEADERS).json()['response']['sessionId']
-    print('session id: {}'.format(HEADERS['session-id']))
 
     payload = {
         "login_key": PASSWORD,
@@ -159,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         host = self.headers.get('Host')
         session_id = HEADERS.get('session-id')
-        self.wfile.write(f'Playlist URL: http://{host}/{PLAYLIST_URL}\nFrndlytv Session ID: {session_id}'.encode('utf8'))
+        self.wfile.write(f'Playlist URL: http://{host}/{PLAYLIST_URL}\nFrndlytv Session ID: {session_id} (KEEP PRIVATE)'.encode('utf8'))
 
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
