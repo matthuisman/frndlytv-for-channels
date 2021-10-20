@@ -144,6 +144,8 @@ class Handler(BaseHTTPRequestHandler):
     
     def _playlist(self):
         rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']
+        if not rows:
+            raise Exception('No channels returned. This is most likely due to your IP address location. Try using the IP environment variable and set it to an IP address from a supported location. eg. --env "IP=72.229.28.185" for Manhattan, New York')
 
         host = self.headers.get('Host')
         self.send_response(200)
@@ -153,6 +155,7 @@ class Handler(BaseHTTPRequestHandler):
         for row in rows:
             id = row['id']
             if id not in LIVE_MAP:
+                print(f"Skipping {id} as not in LIVE_MAP")
                 continue
 
             name = row['display']['title']
