@@ -79,6 +79,7 @@ def login():
 
     data = requests.post('https://frndlytv-api.revlet.net/service/api/auth/signin', json=payload, headers=HEADERS).json()
     if not data['status']:
+        HEADERS.pop('session-id', None)
         print('Failed to login: {}'.format(data['error']['message']))
         return False
     else:
@@ -103,6 +104,9 @@ class Handler(BaseHTTPRequestHandler):
             self._error(e)
 
     def _request(self, url, login_on_failure=True):
+        if 'session-id' not in HEADERS:
+            raise Exception('You are not logged in. Check your username / password are correct and then restart the container.')
+
         data = requests.get(url, headers=HEADERS).json()
         if 'response' not in data:
             if login_on_failure and login():
