@@ -95,30 +95,36 @@ class Handler(BaseHTTPRequestHandler):
 
         func = self.path.split('/')[1]
         if func not in routes:
-            self.send_response(404)
-            self.end_headers()
-            return
+            self._error('Unknown url route')
 
-        routes[func]()
+        try:
+            routes[func]()
+        except Exception as e:
+            self._error(e)
 
     def _request(self, url, login_on_failure=True):
         data = requests.get(url, headers=HEADERS).json()
-
         if 'response' not in data:
             if login_on_failure and login():
                 return self._request(url, login_on_failure=False)
 
-            raise Exception('Failed to get response from url: {}'.format(url))
+            if 'error' in data and data['error'].get('message'):
+                raise Exception(data['error']['message'])
+            else:
+                raise Exception('Failed to get response from url: {}'.format(url))
 
         return data['response']
+
+    def _error(self, message):
+        self.send_response(500)
+        self.end_headers()
+        self.wfile.write(f'Error: {message}'.encode('utf8'))
+        raise Exception(message)
 
     def _play(self, login_on_failure=True):
         id = int(self.path.split('/')[-1])
         if id not in LIVE_MAP:
-            print("Could not find that channel")
-            self.send_response(404)
-            self.end_headers()
-            return
+            raise Exception(f'Could not find channel id: {id}')
 
         slug = LIVE_MAP[id][1]
         data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream?path=channel%2Flive%2F{slug}&code=channel%2Flive%2F{slug}&include_ads=false&is_casted=true')
