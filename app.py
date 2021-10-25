@@ -24,28 +24,7 @@ HEADERS = {
 if IP_ADDR:
     HEADERS['x-forwarded-for'] = IP_ADDR
 
-LIVE_MAP = {
-    10: [58812, 'the_weather_channel'],
-    17: [82773, 'insp'],
-    15: [66143, 'up_tv'],
-    1: [66268, 'hallmark_channel'],
-    4: [70113, 'pixl'],
-    2: [46710, 'hallmark_movies___mysteries'],
-    3: [105723, 'hallmark_drama'],
-    22: [73413, 'fetv'],
-    20: [82563, 'get_tv'],
-    23: [113430, 'circle'],
-    18: [71764, 'byutv'],
-    6: [68827, 'game_show_network'],
-    19: [81289, 'recipe_tv'],
-    16: [120084, 'curiositystream'],
-    21: [99988, 'local_now'],
-    7: [46737, 'outdoor_channel'],
-    8: [60399, 'sportsman_channel'],
-    9: [64046, 'world_fishing_network'],
-    11: [119335, 'babyfirst_tv'],
-    12: [60222, 'qvc'],
-}
+LIVE_MAP_URL = 'https://i.mjh.nz/frndly_tv/app.json'
 
 def login():
     if 'session-id' in HEADERS:
@@ -96,7 +75,9 @@ class Handler(BaseHTTPRequestHandler):
 
         func = self.path.split('/')[1]
         if func not in routes:
-            self._error('Unknown url route')
+            self.send_response(404)
+            self.end_headers()
+            return
 
         try:
             routes[func]()
@@ -125,12 +106,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(f'Error: {message}'.encode('utf8'))
         raise Exception(message)
 
-    def _play(self, login_on_failure=True):
-        id = int(self.path.split('/')[-1])
-        if id not in LIVE_MAP:
-            raise Exception(f'Could not find channel id: {id}')
-
-        slug = LIVE_MAP[id][1]
+    def _play(self):
+        slug = self.path.split('/')[-1]
         data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream?path=channel%2Flive%2F{slug}&code=channel%2Flive%2F{slug}&include_ads=false&is_casted=true')
 
         try:
@@ -143,6 +120,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
     
     def _playlist(self):
+        live_map = requests.get(LIVE_MAP_URL).json()
+
         rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']
         if not rows:
             raise Exception('No channels returned. This is most likely due to your IP address location. Try using the IP environment variable and set it to an IP address from a supported location. eg. --env "IP=72.229.28.185" for Manhattan, New York')
@@ -153,14 +132,15 @@ class Handler(BaseHTTPRequestHandler):
 
         self.wfile.write(b'#EXTM3U\n')
         for row in rows:
-            id = row['id']
-            if id not in LIVE_MAP:
-                print(f"Skipping {id} as not in LIVE_MAP")
+            id = str(row['id'])
+            if id not in live_map:
+                print(f"Skipping {id} as not in live_map")
                 continue
 
             name = row['display']['title']
-            gracenote_id = LIVE_MAP[id][0]
-            url = f'http://{host}/{PLAY_URL}/{id}'
+            gracenote_id, slug = live_map[id]
+
+            url = f'http://{host}/{PLAY_URL}/{slug}'
             bucket, path = row['display']['imageUrl'].split(',')
             logo = f'https://d229kpbsb5jevy.cloudfront.net/frndlytv/{LOGO_SIZE}/{LOGO_SIZE}/content/{bucket}/logos/{path}'
 
