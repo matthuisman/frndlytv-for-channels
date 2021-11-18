@@ -11,6 +11,7 @@ PORT = 80
 USERNAME = os.getenv('USERNAME', '').strip()
 PASSWORD = os.getenv('PASSWORD', '').strip()
 IP_ADDR = os.getenv('IP', '').strip()
+TIMEOUT = 15
 
 LOGO_SIZE = 110
 PLAYLIST_URL = 'playlist.m3u'
@@ -26,11 +27,11 @@ HEADERS = {
 if IP_ADDR:
     HEADERS['x-forwarded-for'] = IP_ADDR
 
-LIVE_MAP_URL = 'https://i.mjh.nz/frndly_tv/app.json'
+EPG_MAP_URL = 'https://i.mjh.nz/frndly_tv/gracenote.json'
 
 def login():
     if 'session-id' in HEADERS:
-        data = requests.get('https://frndlytv-api.revlet.net/service/api/auth/user/info', headers=HEADERS).json()
+        data = requests.get('https://frndlytv-api.revlet.net/service/api/auth/user/info', headers=HEADERS, timeout=TIMEOUT).json()
         if data['status']:
             print('re-logged in')
             return True
@@ -47,7 +48,7 @@ def login():
         'timezone': 'Pacific/Auckland',
     }
 
-    HEADERS['session-id'] = requests.get('https://frndlytv-api.revlet.net/service/api/v1/get/token', params=params, headers=HEADERS).json()['response']['sessionId']
+    HEADERS['session-id'] = requests.get('https://frndlytv-api.revlet.net/service/api/v1/get/token', params=params, headers=HEADERS, timeout=TIMEOUT).json()['response']['sessionId']
 
     payload = {
         "login_key": PASSWORD,
@@ -58,7 +59,7 @@ def login():
         "manufacturer": "nvidia"
     }
 
-    data = requests.post('https://frndlytv-api.revlet.net/service/api/auth/signin', json=payload, headers=HEADERS).json()
+    data = requests.post('https://frndlytv-api.revlet.net/service/api/auth/signin', json=payload, headers=HEADERS, timeout=TIMEOUT).json()
     if not data['status']:
         HEADERS.pop('session-id', None)
         print('Failed to login: {}'.format(data['error']['message']))
@@ -99,11 +100,11 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             self._error(e)
 
-    def _request(self, url, login_on_failure=True):
+    def _request(self, url, params=None, login_on_failure=True):
         if 'session-id' not in HEADERS:
             raise Exception('You are not logged in. Check your username / password are correct and then restart the container.')
 
-        data = requests.get(url, headers=HEADERS).json()
+        data = requests.get(url, params=params, headers=HEADERS, timeout=TIMEOUT).json()
         if 'response' not in data:
             if login_on_failure and login():
                 return self._request(url, login_on_failure=False)
@@ -116,23 +117,50 @@ class Handler(BaseHTTPRequestHandler):
         return data['response']
 
     def _play(self):
-        slug = self.path.split('/')[-1]
-        if 'not_in_live_map_' in slug:
-            raise Exception('ID {} needs to be added to the live map. Contact Matt Huisman'.format(slug.replace('not_in_live_map_', '')))
+        id = self.path.split('/')[-1]
 
-        data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream?path=channel%2Flive%2F{slug}&code=channel%2Flive%2F{slug}&include_ads=false&is_casted=true')
+        data = self._request(f'https://frndlytv-tvguideapi.revlet.net/service/api/v1/static/tvguide?channel_ids={id}&page=0')
+
+        path = None
+        for row in data['data'][0]['programs']:
+            if row['target']['path'] and '/live/' in row['target']['path']:
+                path = row['target']['path']
+                break
+
+        if not path:
+            raise Exception(f'Unable to find live stream for: {id}')
+
+        params = {
+            'path': path,
+            'code': path,
+            'include_ads': 'false',
+            'is_casted': 'true',
+        }
+
+        data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream', params=params)
 
         try:
-            requests.post('https://frndlytv-api.revlet.net/service/api/v1/stream/session/end', data={'poll_key': data['sessionInfo']['streamPollKey']}, headers=HEADERS)
+            url = data['streams'][0]['url']
+        except:
+            raise Exception(f'Unable to find live stream for: {id} ({path})')
+
+        print(f'{id} > {path} > {url}')
+
+        try:
+            requests.post('https://frndlytv-api.revlet.net/service/api/v1/stream/session/end', data={'poll_key': data['sessionInfo']['streamPollKey']}, headers=HEADERS, timeout=TIMEOUT)
         except Exception as e:
             print('failed to send end stream')
 
         self.send_response(302)
-        self.send_header('location', data['streams'][0]['url'])
+        self.send_header('location', url)
         self.end_headers()
-    
+
     def _playlist(self):
-        live_map = requests.get(LIVE_MAP_URL).json()
+        try:
+            epg_map = requests.get(EPG_MAP_URL, timeout=TIMEOUT).json()
+        except:
+            epg_map = {}
+            print(f'Failed to download: {EPG_MAP_URL}')
 
         rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']
         if not rows:
@@ -156,14 +184,15 @@ class Handler(BaseHTTPRequestHandler):
                 continue
 
             name = row['display']['title']
-            if id in live_map:
-                gracenote_id, slug = live_map[id]
-            else:
-                gracenote_id, slug = '', f'not_in_live_map_{id}'
-
-            url = f'http://{host}/{PLAY_URL}/{slug}'
+            url = f'http://{host}/{PLAY_URL}/{id}'
             bucket, path = row['display']['imageUrl'].split(',')
             logo = f'https://d229kpbsb5jevy.cloudfront.net/frndlytv/{LOGO_SIZE}/{LOGO_SIZE}/content/{bucket}/logos/{path}'
+
+            if id in epg_map:
+                gracenote = ' tvc-guide-stationid="{}"'.format(epg_map[id])
+            else:
+                gracenote = ''
+                print(f'No gracenote id found in epg map for: {id}')
 
             chno = ''
             if start_chno is not None:
@@ -171,7 +200,7 @@ class Handler(BaseHTTPRequestHandler):
                     chno = f' tvg-chno="{start_chno}"'
                     start_chno += 1
 
-            self.wfile.write(f'#EXTINF:-1 channel-id="{channel_id}" tvg-logo="{logo}" tvc-guide-stationid="{gracenote_id}"{chno},{name}\n{url}\n'.encode('utf8'))
+            self.wfile.write(f'#EXTINF:-1 channel-id="{channel_id}" tvg-logo="{logo}"{gracenote}{chno},{name}\n{url}\n'.encode('utf8'))
 
     def _status(self):
         self.send_response(200)
