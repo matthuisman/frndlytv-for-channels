@@ -149,8 +149,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b'#EXTM3U\n')
         for row in rows:
             id = str(row['id'])
-            if (include and id not in include) or (exclude and id in exclude):
-                print(f"Skipping {id} due to include / exclude")
+            channel_id = f'frndly-{id}'
+
+            if (include and channel_id not in include) or (exclude and channel_id in exclude):
+                print(f"Skipping {channel_id} due to include / exclude")
                 continue
 
             name = row['display']['title']
@@ -169,7 +171,7 @@ class Handler(BaseHTTPRequestHandler):
                     chno = f' tvg-chno="{start_chno}"'
                     start_chno += 1
 
-            self.wfile.write(f'#EXTINF:-1 channel-id="frndly-{id}" tvg-logo="{logo}" tvc-guide-stationid="{gracenote_id}"{chno},{name}\n{url}\n'.encode('utf8'))
+            self.wfile.write(f'#EXTINF:-1 channel-id="{channel_id}" tvg-logo="{logo}" tvc-guide-stationid="{gracenote_id}"{chno},{name}\n{url}\n'.encode('utf8'))
 
     def _status(self):
         self.send_response(200)
