@@ -72,6 +72,12 @@ class Handler(BaseHTTPRequestHandler):
         self._params = {}
         super().__init__(*args, **kwargs)
 
+    def _error(self, message):
+        self.send_response(500)
+        self.end_headers()
+        self.wfile.write(f'Error: {message}'.encode('utf8'))
+        raise
+
     def do_GET(self):
         routes = {
             PLAYLIST_URL: self._playlist,
@@ -80,7 +86,7 @@ class Handler(BaseHTTPRequestHandler):
         }
 
         parsed = urlparse(self.path)
-        func = parsed.path.lstrip('/')
+        func = parsed.path.split('/')[1]
         self._params = dict(parse_qsl(parsed.query, keep_blank_values=True))
 
         if func not in routes:
@@ -109,14 +115,11 @@ class Handler(BaseHTTPRequestHandler):
 
         return data['response']
 
-    def _error(self, message):
-        self.send_response(500)
-        self.end_headers()
-        self.wfile.write(f'Error: {message}'.encode('utf8'))
-        raise Exception(message)
-
     def _play(self):
         slug = self.path.split('/')[-1]
+        if 'not_in_live_map_' in slug:
+            raise Exception('ID {} needs to be added to the live map. Contact Matt Huisman'.format(slug.replace('not_in_live_map_', '')))
+
         data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream?path=channel%2Flive%2F{slug}&code=channel%2Flive%2F{slug}&include_ads=false&is_casted=true')
 
         try:
@@ -139,18 +142,22 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
-        try: start_chno = int(self._params['start_chno'])
-        except: start_chno = None
+        start_chno = int(self._params['start_chno']) if 'start_chno' in self._params else None
+        include = [x for x in self._params.get('include', '').split(',') if x]
+        exclude = [x for x in self._params.get('exclude', '').split(',') if x]
 
         self.wfile.write(b'#EXTM3U\n')
         for row in rows:
             id = str(row['id'])
-            if id not in live_map:
-                print(f"Skipping {id} as not in live_map")
+            if (include and id not in include) or (exclude and id in exclude):
+                print(f"Skipping {id} due to include / exclude")
                 continue
 
             name = row['display']['title']
-            gracenote_id, slug = live_map[id]
+            if id in live_map:
+                gracenote_id, slug = live_map[id]
+            else:
+                gracenote_id, slug = '', f'not_in_live_map_{id}'
 
             url = f'http://{host}/{PLAY_URL}/{slug}'
             bucket, path = row['display']['imageUrl'].split(',')
@@ -158,8 +165,9 @@ class Handler(BaseHTTPRequestHandler):
 
             chno = ''
             if start_chno is not None:
-                chno = f' tvg-chno="{start_chno}"'
-                start_chno += 1
+                if start_chno > 0:
+                    chno = f' tvg-chno="{start_chno}"'
+                    start_chno += 1
 
             self.wfile.write(f'#EXTINF:-1 channel-id="frndly-{id}" tvg-logo="{logo}" tvc-guide-stationid="{gracenote_id}"{chno},{name}\n{url}\n'.encode('utf8'))
 
