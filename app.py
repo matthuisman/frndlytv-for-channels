@@ -3,6 +3,8 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
+from urllib.parse import urlparse, parse_qsl
+
 import requests
 
 PORT = 80
@@ -66,6 +68,10 @@ def login():
         return True
 
 class Handler(BaseHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        self._params = {}
+        super().__init__(*args, **kwargs)
+
     def do_GET(self):
         routes = {
             PLAYLIST_URL: self._playlist,
@@ -73,7 +79,10 @@ class Handler(BaseHTTPRequestHandler):
             STATUS_URL: self._status,
         }
 
-        func = self.path.split('/')[1]
+        parsed = urlparse(self.path)
+        func = parsed.path.lstrip('/')
+        self._params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+
         if func not in routes:
             self.send_response(404)
             self.end_headers()
@@ -130,6 +139,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
+        try: start_chno = int(self._params['start_chno'])
+        except: start_chno = None
+
         self.wfile.write(b'#EXTM3U\n')
         for row in rows:
             id = str(row['id'])
@@ -144,7 +156,12 @@ class Handler(BaseHTTPRequestHandler):
             bucket, path = row['display']['imageUrl'].split(',')
             logo = f'https://d229kpbsb5jevy.cloudfront.net/frndlytv/{LOGO_SIZE}/{LOGO_SIZE}/content/{bucket}/logos/{path}'
 
-            self.wfile.write(f'#EXTINF:-1 channel-id="frndly-{id}" tvg-logo="{logo}" tvc-guide-stationid="{gracenote_id}",{name}\n{url}\n'.encode('utf8'))
+            chno = ''
+            if start_chno is not None:
+                chno = f' tvg-chno="{start_chno}"'
+                start_chno += 1
+
+            self.wfile.write(f'#EXTINF:-1 channel-id="frndly-{id}" tvg-logo="{logo}" tvc-guide-stationid="{gracenote_id}"{chno},{name}\n{url}\n'.encode('utf8'))
 
     def _status(self):
         self.send_response(200)
