@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -15,7 +16,8 @@ TIMEOUT = 15
 
 LOGO_SIZE = 110
 PLAYLIST_URL = 'playlist.m3u'
-PLAY_URL = 'play'
+PLAY_ID = 'play'
+PLAY_SLUG = 'play2'
 STATUS_URL = ''
 
 HEADERS = {
@@ -27,7 +29,7 @@ HEADERS = {
 if IP_ADDR:
     HEADERS['x-forwarded-for'] = IP_ADDR
 
-EPG_MAP_URL = 'https://i.mjh.nz/frndly_tv/gracenote.json'
+DATA_URL = 'https://i.mjh.nz/frndly_tv/app.json'
 
 def login():
     if 'session-id' in HEADERS:
@@ -82,7 +84,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         routes = {
             PLAYLIST_URL: self._playlist,
-            PLAY_URL: self._play,
+            PLAY_ID: self._play_id,
+            PLAY_SLUG: self._play_slug,
             STATUS_URL: self._status,
         }
 
@@ -116,20 +119,28 @@ class Handler(BaseHTTPRequestHandler):
 
         return data['response']
 
-    def _play(self):
+    def _play_slug(self):
+        slug = self.path.split('/')[-1]
+        self._play_path(f'channel/live/{slug}')
+
+    def _play_id(self):
         id = self.path.split('/')[-1]
 
         data = self._request(f'https://frndlytv-tvguideapi.revlet.net/service/api/v1/static/tvguide?channel_ids={id}&page=0')
 
         path = None
+        cur_time = int(time.time())
         for row in data['data'][0]['programs']:
-            if row['target']['path'] and '/live/' in row['target']['path']:
+            if int(row['display']['markers']['startTime']['value']) / 1000 <= cur_time and int(row['display']['markers']['endTime']['value']) / 1000 >= cur_time:
                 path = row['target']['path']
                 break
 
         if not path:
-            raise Exception(f'Unable to find live stream for: {id}')
+            raise Exception(f'Unable to find live stream for: {id}. Check your time is correct')
 
+        self._play_path(path)
+
+    def _play_path(self, path):
         params = {
             'path': path,
             'code': path,
@@ -142,9 +153,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             url = data['streams'][0]['url']
         except:
-            raise Exception(f'Unable to find live stream for: {id} ({path})')
+            raise Exception(f'Unable to find live stream for: {path}')
 
-        print(f'{id} > {path} > {url}')
+        print(f'{path} > {url}')
 
         try:
             requests.post('https://frndlytv-api.revlet.net/service/api/v1/stream/session/end', data={'poll_key': data['sessionInfo']['streamPollKey']}, headers=HEADERS, timeout=TIMEOUT)
@@ -157,10 +168,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _playlist(self):
         try:
-            epg_map = requests.get(EPG_MAP_URL, timeout=TIMEOUT).json()
+            live_map = requests.get(DATA_URL, timeout=TIMEOUT).json()
         except:
-            epg_map = {}
-            print(f'Failed to download: {EPG_MAP_URL}')
+            live_map = {}
+            print(f'Failed to download: {DATA_URL}')
 
         rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']
         if not rows:
@@ -183,13 +194,22 @@ class Handler(BaseHTTPRequestHandler):
                 print(f"Skipping {channel_id} due to include / exclude")
                 continue
 
+            try:
+                slug, gracenote = live_map[id]
+            except:
+                slug, gracenote = None, None
+
+            if slug:
+                url = f'http://{host}/{PLAY_SLUG}/{slug}'
+            else:
+                url = f'http://{host}/{PLAY_ID}/{id}'
+
             name = row['display']['title']
-            url = f'http://{host}/{PLAY_URL}/{id}'
             bucket, path = row['display']['imageUrl'].split(',')
             logo = f'https://d229kpbsb5jevy.cloudfront.net/frndlytv/{LOGO_SIZE}/{LOGO_SIZE}/content/{bucket}/logos/{path}'
 
-            if id in epg_map:
-                gracenote = ' tvc-guide-stationid="{}"'.format(epg_map[id])
+            if gracenote:
+                gracenote = ' tvc-guide-stationid="{}"'.format(gracenote)
             else:
                 gracenote = ''
                 print(f'No gracenote id found in epg map for: {id}')
