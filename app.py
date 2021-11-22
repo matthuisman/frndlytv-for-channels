@@ -107,7 +107,11 @@ class Handler(BaseHTTPRequestHandler):
         if 'session-id' not in HEADERS:
             raise Exception('You are not logged in. Check your username / password are correct and then restart the container.')
 
-        data = requests.get(url, params=params, headers=HEADERS, timeout=TIMEOUT).json()
+        try:
+            data = requests.get(url, params=params, headers=HEADERS, timeout=TIMEOUT).json()
+        except:
+            data = {}
+
         if 'response' not in data:
             if login_on_failure and login():
                 return self._request(url, login_on_failure=False)
