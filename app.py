@@ -1,15 +1,22 @@
 #!/usr/bin/python3
 import os
+import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qsl
 
 from frndly import Frndly
 
+def sys_arg(index, default=None):
+    try:
+        return sys.argv[index]
+    except IndexError:
+        return default
+
 PORT = 80
-USERNAME = os.getenv('USERNAME', '').strip()
-PASSWORD = os.getenv('PASSWORD', '').strip()
-IP_ADDR = os.getenv('IP', '').strip()
+USERNAME = sys_arg(1, os.getenv('USERNAME', '')).strip()
+PASSWORD = sys_arg(2, os.getenv('PASSWORD', '')).strip()
+IP_ADDR = sys_arg(3, os.getenv('IP', '')).strip()
 
 PLAYLIST_URL = 'playlist.m3u'
 PLAY = 'play'

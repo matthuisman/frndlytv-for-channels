@@ -113,6 +113,9 @@ class Frndly(object):
         print("logging in....")
         self._session.headers.pop('session-id', None)
 
+        if not self._username or not self._password:
+            raise Exception('USERNAME and PASSWORD are required')
+
         params = {
             'box_id': BOX_ID,
             'device_id': DEVICE_ID,
