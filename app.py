@@ -13,10 +13,10 @@ def sys_arg(index, default=None):
     except IndexError:
         return default
 
-PORT = 80
-USERNAME = sys_arg(1, os.getenv('USERNAME', '')).strip()
-PASSWORD = sys_arg(2, os.getenv('PASSWORD', '')).strip()
-IP_ADDR = sys_arg(3, os.getenv('IP', '')).strip()
+PORT = int(sys_arg(1, 80))
+USERNAME = sys_arg(2, os.getenv('USERNAME', '')).strip()
+PASSWORD = sys_arg(3, os.getenv('PASSWORD', '')).strip()
+IP_ADDR = sys_arg(4, os.getenv('IP', '')).strip()
 
 PLAYLIST_URL = 'playlist.m3u'
 PLAY = 'play'
