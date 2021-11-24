@@ -56,6 +56,9 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _playlist(self):
+        channels = frndly.channels()
+        live_map = frndly.live_map()
+
         host = self.headers.get('Host')
         self.send_response(200)
         self.end_headers()
@@ -63,10 +66,9 @@ class Handler(BaseHTTPRequestHandler):
         start_chno = int(self._params['start_chno']) if 'start_chno' in self._params else None
         include = [x for x in self._params.get('include', '').split(',') if x]
         exclude = [x for x in self._params.get('exclude', '').split(',') if x]
-        live_map = frndly.live_map()
 
         self.wfile.write(b'#EXTM3U\n')
-        for row in frndly.channels():
+        for row in channels:
             id = str(row['id'])
             channel_id = f'frndly-{id}'
 
@@ -101,17 +103,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         host = self.headers.get('Host')
-        self.wfile.write(f'Playlist URL: http://{host}/{PLAYLIST_URL}\nFrndlytv Session ID: {frndly.session_id} (KEEP PRIVATE)'.encode('utf8'))
+        self.wfile.write(f'Playlist URL: http://{host}/{PLAYLIST_URL}'.encode('utf8'))
 
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
 
-def run():
-    server = ThreadingSimpleServer(('0.0.0.0', PORT), Handler)
-    server.serve_forever()
-
 if __name__ == '__main__':
     frndly = Frndly(USERNAME, PASSWORD, ip_addr=IP_ADDR)
-    frndly.login()
-    print("Starting server...")
-    run()
+    print(f"Starting server on port {PORT}")
+    server = ThreadingSimpleServer(('0.0.0.0', PORT), Handler)
+    server.serve_forever()

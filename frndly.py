@@ -24,11 +24,8 @@ class Frndly(object):
         self._session = requests.Session()
         self._session.headers.update(HEADERS)
         if ip_addr:
+            print(f"Using IP Address: {ip_addr}")
             self._session.headers['x-forwarded-for'] = ip_addr
-
-    @property
-    def session_id(self):
-        return self._session.headers.get('session-id')
 
     def logo(self, img_url, size=LOGO_SIZE):
         bucket, path = img_url.split(',')
@@ -78,8 +75,8 @@ class Frndly(object):
         return path
 
     def _request(self, url, params=None, login_on_failure=True):
-        if not self.session_id:
-            raise Exception('You are not logged in. Check your username / password are correct and then restart the container.')
+        if not self._session.headers.get('session-id'):
+            self.login()
 
         try:
             data = self._session.get(url, params=params, timeout=TIMEOUT).json()
