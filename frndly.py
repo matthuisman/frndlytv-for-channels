@@ -78,14 +78,17 @@ class Frndly(object):
         if not self._session.headers.get('session-id'):
             self.login()
 
+        resp = self._session.get(url, params=params, timeout=TIMEOUT)
+
         try:
-            data = self._session.get(url, params=params, timeout=TIMEOUT).json()
+            data = resp.json()
         except:
+            print(resp.status_code)
+            print(resp.text)
             data = {}
 
         if 'response' not in data:
             if login_on_failure and self.login():
-                time.sleep(2)
                 return self._request(url, login_on_failure=False)
 
             if 'error' in data and data['error'].get('message'):
