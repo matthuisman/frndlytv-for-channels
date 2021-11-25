@@ -1,22 +1,11 @@
 #!/usr/bin/python3
 import os
-import sys
+import argparse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qsl
 
 from frndly import Frndly
-
-def sys_arg(index, default=None):
-    try:
-        return sys.argv[index]
-    except IndexError:
-        return default
-
-PORT = int(sys_arg(1, 80))
-USERNAME = sys_arg(2, os.getenv('USERNAME', '')).strip()
-PASSWORD = sys_arg(3, os.getenv('PASSWORD', '')).strip()
-IP_ADDR = sys_arg(4, os.getenv('IP', '')).strip()
 
 PLAYLIST_URL = 'playlist.m3u'
 PLAY = 'play'
@@ -83,17 +72,14 @@ class Handler(BaseHTTPRequestHandler):
                 print(f"Skipping {channel_id} due to include / exclude")
                 continue
 
-            try:
-                slug, gracenote = live_map[id]
-            except:
-                slug, gracenote = id, None
-
+            data = live_map.get(id) or {}
+            slug = data.get('slug') or id
             url = f'http://{host}/{PLAY}/{slug}'
             name = row['display']['title']
             logo = frndly.logo(row['display']['imageUrl'])
 
-            if gracenote:
-                gracenote = ' tvc-guide-stationid="{}"'.format(gracenote)
+            if data.get('gracenote'):
+                gracenote = ' tvc-guide-stationid="{}"'.format(data['gracenote'])
             else:
                 gracenote = ''
                 print(f'No gracenote id found in epg map for: {id}')
@@ -108,15 +94,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def _status(self):
         self.send_response(200)
+        self.send_header('content-type', 'text/html; charset=UTF-8')
         self.end_headers()
         host = self.headers.get('Host')
-        self.wfile.write(f'Playlist URL: http://{host}/{PLAYLIST_URL}'.encode('utf8'))
+        self.wfile.write(f'Playlist URL: <b>http://{host}/{PLAYLIST_URL}</b>'.encode('utf8'))
 
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
 
 if __name__ == '__main__':
-    frndly = Frndly(USERNAME, PASSWORD, ip_addr=IP_ADDR)
-    print(f"Starting server on port {PORT}")
-    server = ThreadingSimpleServer(('0.0.0.0', PORT), Handler)
+    parser = argparse.ArgumentParser(description="Frndly TV for Channels")
+    parser.add_argument("-u", "--USERNAME", help="Frndly TV login username (required)")
+    parser.add_argument("-p", "--PASSWORD", help="Frndly TV password (required)")
+    parser.add_argument("-port", "--PORT", default=80, help="Port number for server to use (optional)")
+    parser.add_argument("-ip", "--IP", help="IP address to use (optional)")
+    args = parser.parse_args()
+
+    args.PORT = os.getenv('PORT', '') or args.PORT
+    args.USERNAME = args.USERNAME or os.getenv('USERNAME', '')
+    args.PASSWORD = args.PASSWORD or os.getenv('PASSWORD', '')
+    args.IP = args.IP or os.getenv('IP', '')
+
+    frndly = Frndly(args.USERNAME, args.PASSWORD, ip_addr=args.IP)
+    print(f"Starting server on port {args.PORT}")
+    server = ThreadingSimpleServer(('0.0.0.0', int(args.PORT)), Handler)
     server.serve_forever()
