@@ -103,19 +103,24 @@ class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Frndly TV for Channels")
-    parser.add_argument("-u", "--USERNAME", help="Frndly TV login username (required)")
-    parser.add_argument("-p", "--PASSWORD", help="Frndly TV password (required)")
-    parser.add_argument("-port", "--PORT", default=80, help="Port number for server to use (optional)")
-    parser.add_argument("-ip", "--IP", help="IP address to use (optional)")
-    args = parser.parse_args()
+    if os.getenv('IS_DOCKER'):
+        PORT = 80
+        USERNAME = os.getenv('USERNAME', '')
+        PASSWORD = os.getenv('PASSWORD', '')
+        IP = os.getenv('IP', '')
+    else:
+        parser = argparse.ArgumentParser(description="Frndly TV for Channels")
+        parser.add_argument("-u", "--USERNAME", help="Frndly TV login username (required)")
+        parser.add_argument("-p", "--PASSWORD", help="Frndly TV password (required)")
+        parser.add_argument("-port", "--PORT", default=80, help="Port number for server to use (optional)")
+        parser.add_argument("-ip", "--IP", help="IP address to use (optional)")
+        args = parser.parse_args()
+        PORT = args.PORT
+        USERNAME = args.USERNAME
+        PASSWORD = args.PASSWORD
+        IP = args.IP
 
-    args.PORT = os.getenv('PORT', '') or args.PORT
-    args.USERNAME = args.USERNAME or os.getenv('USERNAME', '')
-    args.PASSWORD = args.PASSWORD or os.getenv('PASSWORD', '')
-    args.IP = args.IP or os.getenv('IP', '')
-
-    frndly = Frndly(args.USERNAME, args.PASSWORD, ip_addr=args.IP)
-    print(f"Starting server on port {args.PORT}")
-    server = ThreadingSimpleServer(('0.0.0.0', int(args.PORT)), Handler)
+    frndly = Frndly(USERNAME, PASSWORD, ip_addr=IP)
+    print(f"Starting server on port {PORT}")
+    server = ThreadingSimpleServer(('0.0.0.0', int(PORT)), Handler)
     server.serve_forever()
