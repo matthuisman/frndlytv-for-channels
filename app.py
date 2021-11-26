@@ -1,13 +1,18 @@
 #!/usr/bin/python3
 import os
+import time
 import argparse
+import datetime as dt
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qsl
+from xml.sax.saxutils import escape
 
 from frndly import Frndly
 
-PLAYLIST_URL = 'playlist.m3u'
+PLAYLIST_URL = 'playlist.m3u8'
+PLAYLIST_URL_LEGACY = 'playlist.m3u'
+EPG_URL = 'epg.xml'
 PLAY = 'play'
 STATUS_URL = ''
 
@@ -25,6 +30,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         routes = {
             PLAYLIST_URL: self._playlist,
+            PLAYLIST_URL_LEGACY: self._playlist,
+            EPG_URL: self._epg,
             PLAY: self._play,
             STATUS_URL: self._status,
         }
@@ -44,7 +51,7 @@ class Handler(BaseHTTPRequestHandler):
             self._error(e)
 
     def _play(self):
-        slug = self.path.split('/')[-1]
+        slug = self.path.split('/')[-1].split('.')[0]
         url = frndly.play(slug)
 
         self.send_response(302)
@@ -60,28 +67,37 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
         start_chno = int(self._params['start_chno']) if 'start_chno' in self._params else None
-        include = [x for x in self._params.get('include', '').split(',') if x]
-        exclude = [x for x in self._params.get('exclude', '').split(',') if x]
+        include = [x.lower().strip() for x in self._params.get('include', '').split(',') if x.strip()]
+        exclude = [x.lower().strip() for x in self._params.get('exclude', '').split(',') if x.strip()]
+        gracenote = self._params.get('gracenote', '').lower().strip()
 
-        self.wfile.write(b'#EXTM3U\n')
+        epg_url = f"http://{host}/{EPG_URL}"
+        if gracenote:
+            epg_url += f'?gracenote={gracenote}'
+
+        self.wfile.write(f'#EXTM3U x-tvg-url="{epg_url}"\n'.encode('utf8'))
         for row in channels:
             id = str(row['id'])
             channel_id = f'frndly-{id}'
+            data = live_map.get(id) or {}
+            slug = data.get('slug') or id
+            url = f'http://{host}/{PLAY}/{slug}.m3u8'
+            name = row['display']['title']
+            logo = frndly.logo(row['display']['imageUrl'])
+            gracenote_id = data.get('gracenote')
 
-            if (include and channel_id not in include) or (exclude and channel_id in exclude):
+            if (include and channel_id.lower() not in include) or (exclude and channel_id.lower() in exclude):
                 print(f"Skipping {channel_id} due to include / exclude")
                 continue
 
-            data = live_map.get(id) or {}
-            slug = data.get('slug') or id
-            url = f'http://{host}/{PLAY}/{slug}'
-            name = row['display']['title']
-            logo = frndly.logo(row['display']['imageUrl'])
+            if (gracenote == 'include' and not gracenote_id) or (gracenote == 'exclude' and gracenote_id):
+                print(f"Skipping {channel_id} due to gracenote")
+                continue
 
-            if data.get('gracenote'):
-                gracenote = ' tvc-guide-stationid="{}"'.format(data['gracenote'])
+            if gracenote_id:
+                gracenote_id = ' tvc-guide-stationid="{}"'.format(gracenote_id)
             else:
-                gracenote = ''
+                gracenote_id = ''
                 print(f'No gracenote id found in epg map for: {id}')
 
             chno = ''
@@ -90,14 +106,56 @@ class Handler(BaseHTTPRequestHandler):
                     chno = f' tvg-chno="{start_chno}"'
                     start_chno += 1
 
-            self.wfile.write(f'#EXTINF:-1 channel-id="{channel_id}" tvg-logo="{logo}"{gracenote}{chno},{name}\n{url}\n'.encode('utf8'))
+            self.wfile.write(f'#EXTINF:-1 channel-id="{channel_id}" tvg-id="{channel_id}" tvg-logo="{logo}"{gracenote_id}{chno},{name}\n{url}\n'.encode('utf8'))
+
+    def _epg(self):
+        channels = frndly.channels()
+        live_map = frndly.live_map()
+
+        try: days = int(self._params.get('days', ''))
+        except: days = 3
+        gracenote = self._params.get('gracenote', '').lower().strip()
+
+        if days > 7:
+            days = 7
+
+        if days < 1:
+            days = 1
+
+        self.send_response(200)
+        self.end_headers()
+
+        self.wfile.write(b'<?xml version="1.0" encoding="utf-8" ?><tv>')
+        ids = []
+        for row in channels:
+            id = str(row['id'])
+            channel_id = f'frndly-{id}'
+            data = live_map.get(id) or {}
+            gracenote_id = data.get('gracenote')
+
+            if (gracenote == 'include' and not gracenote_id) or (gracenote == 'exclude' and gracenote_id):
+                print(f"Skipping {channel_id} due to gracenote")
+                continue
+
+            ids.append(id)
+            self.wfile.write(f'<channel id="{channel_id}"></channel>'.encode('utf8'))
+
+        for id, programs in frndly.guide(ids, start=int(time.time()), days=days).items():
+            channel_id = f'frndly-{id}'
+            for program in programs:
+                start = dt.datetime.utcfromtimestamp(int(int(program['display']['markers']['startTime']['value']) / 1000)).strftime("%Y%m%d%H%M%S +0000")
+                stop = dt.datetime.utcfromtimestamp(int(int(program['display']['markers']['endTime']['value']) / 1000)).strftime("%Y%m%d%H%M%S +0000")
+                title = escape(program['display']['title'])
+                self.wfile.write(f'<programme channel="{channel_id}" start="{start}" stop="{stop}"><title>{title}</title></programme>'.encode('utf8'))
+
+        self.wfile.write(b'</tv>')
 
     def _status(self):
         self.send_response(200)
         self.send_header('content-type', 'text/html; charset=UTF-8')
         self.end_headers()
         host = self.headers.get('Host')
-        self.wfile.write(f'Playlist URL: <b>http://{host}/{PLAYLIST_URL}</b>'.encode('utf8'))
+        self.wfile.write(f'Playlist URL: <b><a href="http://{host}/{PLAYLIST_URL}">http://{host}/{PLAYLIST_URL}</b></a><br>EPG URL: <b><a href="http://{host}/{EPG_URL}">http://{host}/{EPG_URL}</a></b>'.encode('utf8'))
 
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass

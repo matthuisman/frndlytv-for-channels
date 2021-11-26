@@ -25,7 +25,7 @@ class Frndly(object):
         self._session.headers.update(HEADERS)
         if ip_addr:
             print(f"Using IP Address: {ip_addr}")
-            self._session.headers['x-forwarded-for'] = ip_addr
+            self._session.headers['x-forwarded-for'] = ip_addr #seems to break playback
 
     def logo(self, img_url, size=LOGO_SIZE):
         bucket, path = img_url.split(',')
@@ -59,12 +59,33 @@ class Frndly(object):
 
         return url
 
-    def _channel_path(self, channel_id):
-        data = self._request(f'https://frndlytv-tvguideapi.revlet.net/service/api/v1/static/tvguide?channel_ids={channel_id}&page=0')
+    def guide(self, channel_ids, start=None, days=0):
+        programs = {}
+        for i in range(days):
+            params = {
+                'channel_ids': ','.join(channel_ids),
+                'page': 0,
+            }
 
+            if start:
+                end = start+86400
+                params['start_time'] = start*1000
+                params['end_time'] = end*1000
+                start = end
+
+            for row in self._request(f'https://frndlytv-tvguideapi.revlet.net/service/api/v1/static/tvguide', params=params)['data']:
+                channel_id = str(row['channelId'])
+                if channel_id not in programs:
+                    programs[channel_id] = []
+                programs[channel_id].extend(row['programs'])
+
+        return programs
+
+    def _channel_path(self, channel_id):
         path = None
         cur_time = int(time.time())
-        for row in data['data'][0]['programs']:
+
+        for row in self.guide([channel_id])[channel_id]:
             if int(row['display']['markers']['startTime']['value']) / 1000 <= cur_time and int(row['display']['markers']['endTime']['value']) / 1000 >= cur_time:
                 path = row['target']['path']
                 break
@@ -77,6 +98,7 @@ class Frndly(object):
     def _request(self, url, params=None, login_on_failure=True):
         if not self._session.headers.get('session-id'):
             self.login()
+            login_on_failure = False
 
         try:
             data = self._session.get(url, params=params, timeout=TIMEOUT).json()
@@ -84,7 +106,14 @@ class Frndly(object):
             data = {}
 
         if 'response' not in data:
-            if login_on_failure and self.login():
+            try:
+                error_code = data['error']['code']
+                print(error_code)
+                print(data['error']['message'])
+            except:
+                error_code = None
+
+            if error_code != 402 and login_on_failure and self.login():
                 return self._request(url, params=params, login_on_failure=False)
 
             if 'error' in data and data['error'].get('message'):
