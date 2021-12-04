@@ -45,10 +45,16 @@ class Frndly(object):
         }
 
         data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream', params=params)
+
         try:
-            url = data['streams'][0]['url']
+            stream = data['streams'][0]
+            url = stream['url']
+            _type = stream['streamType']
         except:
             raise Exception(f'Unable to find live stream for: {path}')
+
+        if _type != 'akamai':
+            raise Exception(f'Unsupported stream type: {_type} ({url})')
 
         print(f'{path} > {url}')
 
