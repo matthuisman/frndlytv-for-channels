@@ -53,7 +53,7 @@ class Frndly(object):
         except:
             raise Exception(f'Unable to find live stream for: {path}')
 
-        if _type != 'akamai':
+        if _type.lower().strip() in ('widevine',):
             raise Exception(f'Unsupported stream type: {_type} ({url})')
 
         print(f'{path} > {url}')
