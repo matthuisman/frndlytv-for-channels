@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
-        self.wfile.write(b'<?xml version="1.0" encoding="utf-8" ?><tv>')
+        self.wfile.write(b'<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE tv SYSTEM "xmltv.dtd"><tv generator-info-name="www.matthuisman.nz">')
         ids = []
         for row in channels:
             id = str(row['id'])
