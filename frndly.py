@@ -65,7 +65,7 @@ class Frndly(object):
 
         return url
 
-    def guide(self, channel_ids, start=None, days=0):
+    def guide(self, channel_ids, start=None, days=1):
         programs = {}
         for i in range(days):
             params = {
