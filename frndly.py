@@ -91,7 +91,8 @@ class Frndly(object):
         path = None
         cur_time = int(time.time())
 
-        for row in self.guide([channel_id])[channel_id]:
+        data = self.guide([channel_id,])
+        for row in data.get(channel_id, []):
             if int(row['display']['markers']['startTime']['value']) / 1000 <= cur_time and int(row['display']['markers']['endTime']['value']) / 1000 >= cur_time:
                 path = row['target']['path']
                 break
