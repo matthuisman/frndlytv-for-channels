@@ -132,13 +132,14 @@ class Handler(BaseHTTPRequestHandler):
             channel_id = f'frndly-{id}'
             data = live_map.get(id) or {}
             gracenote_id = data.get('gracenote')
+            name = escape(row['display']['title'])
 
             if (gracenote == 'include' and not gracenote_id) or (gracenote == 'exclude' and gracenote_id):
                 print(f"Skipping {channel_id} due to gracenote")
                 continue
 
             ids.append(id)
-            self.wfile.write(f'<channel id="{channel_id}"></channel>'.encode('utf8'))
+            self.wfile.write(f'<channel id="{channel_id}"><display-name>{name}</display-name></channel>'.encode('utf8'))
 
         for id, programs in frndly.guide(ids, start=int(time.time()), days=days).items():
             channel_id = f'frndly-{id}'
