@@ -191,6 +191,7 @@ if __name__ == '__main__':
     frndly = Frndly(USERNAME, PASSWORD, ip_addr=IP)
 
     def keep_alive():
+        time.sleep(2)
         while True:
             try:
                 print("Keep alive!")
