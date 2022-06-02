@@ -23,6 +23,7 @@ class Frndly(object):
         self._password = password
         self._session = requests.Session()
         self._session.headers.update(HEADERS)
+        self._live_map = {}
         if ip_addr:
             print(f"Using IP Address: {ip_addr}")
             self._session.headers['x-forwarded-for'] = ip_addr #seems to break playback
@@ -139,10 +140,11 @@ class Frndly(object):
 
     def live_map(self):
         try:
-            return self._session.get(DATA_URL, timeout=TIMEOUT).json()
+            self._live_map = self._session.get(DATA_URL, timeout=TIMEOUT).json()
         except:
             print(f'Failed to download: {DATA_URL}')
-            return {}
+
+        return self._live_map
 
     def login(self):
         print("logging in....")

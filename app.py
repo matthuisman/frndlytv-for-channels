@@ -3,10 +3,12 @@ import os
 import time
 import argparse
 import datetime as dt
+import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qsl
 from xml.sax.saxutils import escape
+import requests
 
 from frndly import Frndly
 
@@ -14,6 +16,7 @@ PLAYLIST_URL = 'playlist.m3u8'
 PLAYLIST_URL_LEGACY = 'playlist.m3u'
 EPG_URL = 'epg.xml'
 PLAY = 'play'
+KEEP_ALIVE = 'keep_alive'
 STATUS_URL = ''
 
 class Handler(BaseHTTPRequestHandler):
@@ -33,6 +36,7 @@ class Handler(BaseHTTPRequestHandler):
             PLAYLIST_URL_LEGACY: self._playlist,
             EPG_URL: self._epg,
             PLAY: self._play,
+            KEEP_ALIVE: self._keep_alive,
             STATUS_URL: self._status,
         }
 
@@ -49,6 +53,11 @@ class Handler(BaseHTTPRequestHandler):
             routes[func]()
         except Exception as e:
             self._error(e)
+
+    def _keep_alive(self):
+        frndly.channels()
+        self.send_response(200)
+        self.end_headers()
 
     def _play(self):
         slug = self.path.split('/')[-1].split('.')[0]
@@ -180,6 +189,20 @@ if __name__ == '__main__':
         IP = args.IP
 
     frndly = Frndly(USERNAME, PASSWORD, ip_addr=IP)
+
+    def keep_alive():
+        while True:
+            try:
+                print("Keep alive!")
+                requests.get('http://127.0.0.1:{}/{}'.format(PORT, KEEP_ALIVE), timeout=20)
+            except:
+                pass
+            time.sleep(60*5)
+
+    thread = threading.Thread(target=keep_alive)
+    thread.daemon = True
+    thread.start()
+
     print(f"Starting server on port {PORT}")
     server = ThreadingSimpleServer(('0.0.0.0', int(PORT)), Handler)
     server.serve_forever()
