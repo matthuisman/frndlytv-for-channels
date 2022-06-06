@@ -55,7 +55,7 @@ class Handler(BaseHTTPRequestHandler):
             self._error(e)
 
     def _keep_alive(self):
-        frndly.channels()
+        frndly.keep_alive()
         self.send_response(200)
         self.end_headers()
 
@@ -176,21 +176,27 @@ if __name__ == '__main__':
         USERNAME = os.getenv('USERNAME', '')
         PASSWORD = os.getenv('PASSWORD', '')
         IP = os.getenv('IP', '')
+        KEEP_ALIVE_MINS = int(os.getenv('KEEP_ALIVE', 5))
     else:
         parser = argparse.ArgumentParser(description="Frndly TV for Channels")
         parser.add_argument("-u", "--USERNAME", help="Frndly TV login username (required)")
         parser.add_argument("-p", "--PASSWORD", help="Frndly TV password (required)")
         parser.add_argument("-port", "--PORT", default=80, help="Port number for server to use (optional)")
+        parser.add_argument("-k", "--KEEP_ALIVE", default=5, help="Minutes between keep alive requests. 0 = disable (optional)")
         parser.add_argument("-ip", "--IP", help="IP address to use (optional)")
         args = parser.parse_args()
         PORT = args.PORT
         USERNAME = args.USERNAME
         PASSWORD = args.PASSWORD
         IP = args.IP
+        KEEP_ALIVE_MINS = int(args.KEEP_ALIVE)
 
     frndly = Frndly(USERNAME, PASSWORD, ip_addr=IP)
 
     def keep_alive():
+        if not KEEP_ALIVE_MINS:
+            return
+
         time.sleep(2)
         while True:
             try:
@@ -198,7 +204,7 @@ if __name__ == '__main__':
                 requests.get('http://127.0.0.1:{}/{}'.format(PORT, KEEP_ALIVE), timeout=20)
             except:
                 pass
-            time.sleep(60*5)
+            time.sleep(60*KEEP_ALIVE_MINS)
 
     thread = threading.Thread(target=keep_alive)
     thread.daemon = True

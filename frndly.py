@@ -6,6 +6,7 @@ TENANT_CODE = 'frndlytv'
 DEVICE_ID = 43
 TIMEOUT = 15
 LOGO_SIZE = 400
+FORCE_LOGIN = 60*60*5 #force login after 5 hours
 
 HEADERS = {
     'user-agent': 'okhttp/3.12.5',
@@ -24,6 +25,7 @@ class Frndly(object):
         self._session = requests.Session()
         self._session.headers.update(HEADERS)
         self._live_map = {}
+        self._last_login = 0
         if ip_addr:
             print(f"Using IP Address: {ip_addr}")
             self._session.headers['x-forwarded-for'] = ip_addr #seems to break playback
@@ -131,6 +133,14 @@ class Frndly(object):
 
         return data['response']
 
+    def keep_alive(self):
+        try: self.channels()
+        except: pass
+        # Force login after X hours
+        if (time.time() - self._last_login) > FORCE_LOGIN:
+            print("Forcing login!")
+            self.login()
+
     def channels(self):
         rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']
         if not rows:
@@ -149,7 +159,6 @@ class Frndly(object):
     def login(self):
         print("logging in....")
         self._session.headers.pop('session-id', None)
-
         if not self._username or not self._password:
             raise Exception('USERNAME and PASSWORD are required')
 
@@ -179,5 +188,6 @@ class Frndly(object):
             raise Exception('Failed to login: {}'.format(data['error']['message']))
 
         print("Logged in!")
+        self._last_login = time.time() - 10
         self._session.headers['session-id'] = session_id
         return True
