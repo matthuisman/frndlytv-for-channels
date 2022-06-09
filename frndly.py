@@ -1,3 +1,4 @@
+import os
 import time
 import requests
 
@@ -22,13 +23,13 @@ class Frndly(object):
     def __init__(self, username, password, ip_addr=None):
         self._username = username
         self._password = password
-        self._session = requests.Session()
-        self._session.headers.update(HEADERS)
+        self._headers = {}
+        self._headers.update(HEADERS)
         self._live_map = {}
         self._last_login = 0
         if ip_addr:
             print(f"Using IP Address: {ip_addr}")
-            self._session.headers['x-forwarded-for'] = ip_addr #seems to break playback
+            self._headers['x-forwarded-for'] = ip_addr
 
     def logo(self, img_url, size=LOGO_SIZE):
         bucket, path = img_url.split(',')
@@ -62,7 +63,7 @@ class Frndly(object):
         print(f'{path} > {url}')
 
         try:
-            self._session.post('https://frndlytv-api.revlet.net/service/api/v1/stream/session/end', data={'poll_key': data['sessionInfo']['streamPollKey']}, timeout=TIMEOUT)
+            requests.post('https://frndlytv-api.revlet.net/service/api/v1/stream/session/end', data={'poll_key': data['sessionInfo']['streamPollKey']}, headers=self._headers, timeout=TIMEOUT)
         except Exception as e:
             print('failed to send end stream')
 
@@ -106,12 +107,12 @@ class Frndly(object):
         return path
 
     def _request(self, url, params=None, login_on_failure=True):
-        if not self._session.headers.get('session-id'):
+        if not self._headers.get('session-id'):
             self.login()
             login_on_failure = False
 
         try:
-            data = self._session.get(url, params=params, timeout=TIMEOUT).json()
+            data = requests.get(url, params=params, headers=self._headers, timeout=TIMEOUT).json()
         except:
             data = {}
 
@@ -144,13 +145,19 @@ class Frndly(object):
     def channels(self):
         rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']
         if not rows:
-            raise Exception('No channels returned. This is most likely due to your IP address location. Try using the IP environment variable and set it to an IP address from a supported location. eg. --env "IP=72.229.28.185" for Manhattan, New York')
+            msg = 'No channels returned. This is most likely due to your IP address location.'
+            if os.getenv('IS_DOCKER'):
+                msg += ' You can spoof an IP address for a supported location using IP environment variable. eg. --env "IP=72.229.28.185" for Manhattan, New York.'
+            else:
+                msg += ' You can spoof an IP address for a supported location using IP cmdline argument. eg. --IP 72.229.28.185 for Manhattan, New York.'
+            msg += ' This may not work with all channels.'
+            raise Exception(msg)
 
         return rows
 
     def live_map(self):
         try:
-            self._live_map = self._session.get(DATA_URL, timeout=TIMEOUT).json()
+            self._live_map = requests.get(DATA_URL, timeout=TIMEOUT).json()
         except:
             print(f'Failed to download: {DATA_URL}')
 
@@ -158,7 +165,6 @@ class Frndly(object):
 
     def login(self):
         print("logging in....")
-        self._session.headers.pop('session-id', None)
         if not self._username or not self._password:
             raise Exception('USERNAME and PASSWORD are required')
 
@@ -172,7 +178,8 @@ class Frndly(object):
             'timezone': 'Pacific/Auckland',
         }
 
-        session_id = self._session.get('https://frndlytv-api.revlet.net/service/api/v1/get/token', params=params, timeout=TIMEOUT).json()['response']['sessionId']
+        headers = {i:self._headers[i] for i in self._headers if i!='session-id'}
+        headers['session-id'] = requests.get('https://frndlytv-api.revlet.net/service/api/v1/get/token', params=params, headers=headers, timeout=TIMEOUT).json()['response']['sessionId']
 
         payload = {
             "login_id": self._username,
@@ -183,11 +190,11 @@ class Frndly(object):
             "manufacturer": "nvidia"
         }
 
-        data = self._session.post('https://frndlytv-api.revlet.net/service/api/auth/signin', json=payload, headers={'session-id': session_id}, timeout=TIMEOUT).json()
+        data = requests.post('https://frndlytv-api.revlet.net/service/api/auth/signin', json=payload, headers=headers, timeout=TIMEOUT).json()
         if not data['status']:
             raise Exception('Failed to login: {}'.format(data['error']['message']))
 
         print("Logged in!")
         self._last_login = time.time() - 10
-        self._session.headers['session-id'] = session_id
+        self._headers = headers
         return True
