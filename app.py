@@ -176,13 +176,13 @@ if __name__ == '__main__':
         USERNAME = os.getenv('USERNAME', '')
         PASSWORD = os.getenv('PASSWORD', '')
         IP = os.getenv('IP', '')
-        KEEP_ALIVE_MINS = int(os.getenv('KEEP_ALIVE', 5))
+        KEEP_ALIVE_MINS = int(os.getenv('KEEP_ALIVE', 0))
     else:
         parser = argparse.ArgumentParser(description="Frndly TV for Channels")
         parser.add_argument("-u", "--USERNAME", help="Frndly TV login username (required)")
         parser.add_argument("-p", "--PASSWORD", help="Frndly TV password (required)")
         parser.add_argument("-port", "--PORT", default=80, help="Port number for server to use (optional)")
-        parser.add_argument("-k", "--KEEP_ALIVE", default=5, help="Minutes between keep alive requests. 0 = disable (optional)")
+        parser.add_argument("-k", "--KEEP_ALIVE", default=0, help="Minutes between keep alive requests. 0 (default) = disable (optional)")
         parser.add_argument("-ip", "--IP", help="IP address to use (optional)")
         args = parser.parse_args()
         PORT = args.PORT
