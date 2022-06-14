@@ -135,12 +135,11 @@ class Frndly(object):
         return data['response']
 
     def keep_alive(self):
-        try: self.channels()
-        except: pass
         # Force login after X hours
         if (time.time() - self._last_login) > FORCE_LOGIN:
             print("Forcing login!")
             self.login()
+        self.channels()
 
     def channels(self):
         rows = self._request('https://frndlytv-api.revlet.net/service/api/v1/tvguide/channels?skip_tabs=0')['data']

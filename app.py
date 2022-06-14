@@ -195,7 +195,6 @@ if __name__ == '__main__':
 
     def keep_alive():
         if not KEEP_ALIVE_MINS:
-            print("Keep alive disabled")
             return
 
         print("Keep alive mins: {}".format(KEEP_ALIVE_MINS))
