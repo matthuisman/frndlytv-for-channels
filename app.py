@@ -165,7 +165,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('content-type', 'text/html; charset=UTF-8')
         self.end_headers()
         host = self.headers.get('Host')
-        self.wfile.write(f'Playlist URL: <b><a href="http://{host}/{PLAYLIST_URL}">http://{host}/{PLAYLIST_URL}</b></a><br>EPG URL: <b><a href="http://{host}/{EPG_URL}">http://{host}/{EPG_URL}</a></b>'.encode('utf8'))
+        self.wfile.write(f'''
+<h2>Channels Source 1</h2>
+Stream Format: <b>HLS</b><br>
+Refresh: <b>Daily</b><br>
+Source URL: <b><a href="http://{host}/{PLAYLIST_URL}?gracenote=include" target="_blank">http://{host}/{PLAYLIST_URL}?gracenote=include</b></a><br>
+XMLTV Data URL: <b>(Leave Blank)<br>
+<h2>Channels Source 2</h2>
+Stream Format: <b>HLS</b><br>
+Refresh: <b>Daily</b><br>
+Source URL: <b><a href="http://{host}/{PLAYLIST_URL}?gracenote=exclude" target="_blank">http://{host}/{PLAYLIST_URL}?gracenote=exclude</b></a><br>
+XMLTV Data URL: <b><a href="http://{host}/{EPG_URL}?gracenote=exclude" target="_blank">http://{host}/{EPG_URL}?gracenote=exclude</a></b>
+'''.encode('utf8'))
 
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
