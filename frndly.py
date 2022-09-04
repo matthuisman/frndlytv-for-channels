@@ -57,6 +57,11 @@ class Frndly(object):
         except:
             raise Exception(f'Unable to find live stream for: {path}')
 
+        try:
+            url += '&start={0}&startTime={0}'.format(int(int(data['playerSettings'][0]['value'])/1000))
+        except:
+            pass
+
         if _type.lower().strip() in ('widevine',):
             raise Exception(f'Unsupported stream type: {_type} ({url})')
 
@@ -106,13 +111,13 @@ class Frndly(object):
 
         return path
 
-    def _request(self, url, params=None, login_on_failure=True):
+    def _request(self, url, params=None, login_on_failure=True, **kwargs):
         if not self._headers.get('session-id'):
             self.login()
             login_on_failure = False
 
         try:
-            data = requests.get(url, params=params, headers=self._headers, timeout=TIMEOUT).json()
+            data = requests.get(url, params=params, headers=self._headers, timeout=TIMEOUT, **kwargs).json()
         except:
             data = {}
 
