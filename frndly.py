@@ -157,7 +157,7 @@ class Frndly(object):
             msg += ' This may not work with all channels.'
             raise Exception(msg)
 
-        return rows
+        return [x for x in rows if not x.get('metadata',{}).get('isChannelBanner', '')]
 
     def live_map(self):
         try:
