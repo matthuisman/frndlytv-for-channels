@@ -76,7 +76,7 @@ class Frndly(object):
 
     def guide(self, channel_ids, start=None, days=1):
         programs = {}
-        for i in range(days):
+        for _ in range(days):
             params = {
                 'channel_ids': ','.join(channel_ids),
                 'page': 0,
