@@ -111,33 +111,27 @@ class Frndly(object):
 
         return path
 
-    def _request(self, url, params=None, login_on_failure=True, **kwargs):
-        if not self._headers.get('session-id'):
-            self.login()
-            login_on_failure = False
-
-        try:
-            data = requests.get(url, params=params, headers=self._headers, timeout=TIMEOUT, **kwargs).json()
-        except:
-            data = {}
-
-        if 'response' not in data:
+    def _request(self, url, params=None, **kwargs):
+        for _ in range(3):
             try:
-                error_code = data['error']['code']
-                print(error_code)
-                print(data['error']['message'])
-            except:
-                error_code = None
+                print(f"Requesting: {url}")
+                data = requests.get(url, params=params, headers=self._headers, timeout=TIMEOUT, **kwargs).json()
 
-            if error_code != 402 and login_on_failure and self.login():
-                return self._request(url, params=params, login_on_failure=False)
+                if 'response' in data:
+                    return data['response']
 
-            if 'error' in data and data['error'].get('message'):
-                raise Exception(data['error']['message'])
-            else:
-                raise Exception('Failed to get response from url: {}'.format(url))
+                try:
+                    error_code = data['error']['code']
+                    print(error_code)
+                    print(data['error']['message'])
+                except:
+                    error_code = None
 
-        return data['response']
+                self.login()
+            except Exception as e:
+                print(e)
+
+        raise Exception('Failed to get response from url: {}'.format(url))
 
     def keep_alive(self):
         # Force login after X hours
@@ -182,7 +176,7 @@ class Frndly(object):
             'timezone': 'Pacific/Auckland',
         }
 
-        headers = {i:self._headers[i] for i in self._headers if i!='session-id'}
+        headers = {i: self._headers[i] for i in self._headers if i != 'session-id'}
         headers['session-id'] = requests.get('https://frndlytv-api.revlet.net/service/api/v1/get/token', params=params, headers=headers, timeout=TIMEOUT).json()['response']['sessionId']
 
         payload = {
