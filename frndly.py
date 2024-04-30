@@ -20,16 +20,13 @@ LOGO_URL = 'https://d229kpbsb5jevy.cloudfront.net/frndlytv/{size}/{size}/content
 DATA_URL = 'https://i.mjh.nz/frndly_tv/app.json'
 
 class Frndly(object):
-    def __init__(self, username, password, ip_addr=None):
+    def __init__(self, username, password):
         self._username = username
         self._password = password
         self._headers = {}
         self._headers.update(HEADERS)
         self._live_map = {}
         self._last_login = 0
-        if ip_addr:
-            print(f"Using IP Address: {ip_addr}")
-            self._headers['x-forwarded-for'] = ip_addr
 
     def logo(self, img_url, size=LOGO_SIZE):
         bucket, path = img_url.split(',')
