@@ -89,7 +89,11 @@ class Handler(BaseHTTPRequestHandler):
             id = str(row['id'])
             channel_id = f'frndly-{id}'
             data = live_map.get(id) or {}
-            slug = data.get('slug') or id
+
+            slug = id
+            if 'slug' in data:
+                slug = f"{data['slug']}-{id}"
+
             url = f'http://{host}/{PLAY}/{slug}.m3u8'
             name = row['display']['title']
             logo = frndly.logo(row['display']['imageUrl'])
