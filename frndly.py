@@ -87,8 +87,8 @@ class Frndly(object):
             slug, id = slug.rsplit('-', 1)
             try:
                 return self._get_play_url(f'channel/live/{slug}')
-            except Exception as e:
-                print(f"Failed to play via slug {slug} due to {e}. Fallback to ID")
+            except Exception:
+                print(f"Failed to play via slug {slug}. Fallback to ID")
 
         print(f"Attempting playback using ID {id}")
         path = self._channel_path(id)
@@ -129,6 +129,9 @@ class Frndly(object):
                     error_code = data['error']['code']
                     print(error_code)
                     print(data['error']['message'])
+                    # dont retry on 404s
+                    if error_code == 404:
+                        break
                 except:
                     error_code = None
 
@@ -199,5 +202,6 @@ class Frndly(object):
 
         print("Logged in!")
         self._last_login = time.time() - 10
+        time.sleep(1)
         self._headers = headers
         return True
