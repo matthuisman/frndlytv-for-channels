@@ -32,12 +32,22 @@ class Frndly(object):
         bucket, path = img_url.split(',')
         return LOGO_URL.format(size=size, bucket=bucket, path=path)
 
-    def play(self, slug):
-        if slug.isdigit():
-            path = self._channel_path(slug)
-        else:
-            path = f'channel/live/{slug}'
+    def _channel_path(self, channel_id):
+        path = None
+        cur_time = int(time.time())
 
+        data = self.guide([channel_id,])
+        for row in data.get(channel_id, []):
+            if int(row['display']['markers']['startTime']['value']) / 1000 <= cur_time and int(row['display']['markers']['endTime']['value']) / 1000 >= cur_time:
+                path = row['target']['path']
+                break
+
+        if not path:
+            raise Exception(f'Unable to find live stream for: {channel_id}. Check your time is correct')
+
+        return path
+
+    def _get_play_url(self, path):
         params = {
             'path': path,
             'code': path,
@@ -63,13 +73,26 @@ class Frndly(object):
             raise Exception(f'Unsupported stream type: {_type} ({url})')
 
         print(f'{path} > {url}')
-
         try:
             requests.post('https://frndlytv-api.revlet.net/service/api/v1/stream/session/end', data={'poll_key': data['sessionInfo']['streamPollKey']}, headers=self._headers, timeout=TIMEOUT)
         except Exception as e:
-            print('failed to send end stream')
+            print(f'Failed to send end stream {e}')
 
         return url
+
+    def play(self, slug):
+        if slug.isdigit():
+            id = slug
+        else:
+            slug, id = slug.rsplit('-', 1)
+            try:
+                return self._get_play_url(f'channel/live/{slug}')
+            except Exception:
+                print(f"Failed to play via slug {slug}. Fallback to ID")
+
+        print(f"Attempting playback using ID {id}")
+        path = self._channel_path(id)
+        return self._get_play_url(path)
 
     def guide(self, channel_ids, start=None, days=1):
         programs = {}
@@ -93,21 +116,6 @@ class Frndly(object):
 
         return programs
 
-    def _channel_path(self, channel_id):
-        path = None
-        cur_time = int(time.time())
-
-        data = self.guide([channel_id,])
-        for row in data.get(channel_id, []):
-            if int(row['display']['markers']['startTime']['value']) / 1000 <= cur_time and int(row['display']['markers']['endTime']['value']) / 1000 >= cur_time:
-                path = row['target']['path']
-                break
-
-        if not path:
-            raise Exception(f'Unable to find live stream for: {channel_id}. Check your time is correct')
-
-        return path
-
     def _request(self, url, params=None, **kwargs):
         for _ in range(3):
             try:
@@ -121,6 +129,9 @@ class Frndly(object):
                     error_code = data['error']['code']
                     print(error_code)
                     print(data['error']['message'])
+                    # dont retry on 404s
+                    if error_code == 404:
+                        break
                 except:
                     error_code = None
 
@@ -191,5 +202,6 @@ class Frndly(object):
 
         print("Logged in!")
         self._last_login = time.time() - 10
+        time.sleep(1)
         self._headers = headers
         return True
