@@ -56,9 +56,8 @@ class Frndly(object):
         }
 
         data = self._request(f'https://frndlytv-api.revlet.net/service/api/v1/page/stream', params=params)
-
         try:
-            stream = data['streams'][0]
+            stream = sorted(data['streams'], key=lambda x: x['keys']['licenseKey'])[0]
             url = stream['url']
             _type = stream['streamType']
         except:
@@ -158,8 +157,7 @@ class Frndly(object):
                 msg += ' You can spoof an IP address for a supported location using IP cmdline argument. eg. --IP 72.229.28.185 for Manhattan, New York.'
             msg += ' This may not work with all channels.'
             raise Exception(msg)
-
-        return [x for x in rows if not x.get('metadata',{}).get('isChannelBanner', '')]
+        return [x for x in rows if x.get('metadata',{}).get('isChannelBanner', '').lower() != 'true']
 
     def live_map(self):
         try:
